@@ -1,4 +1,4 @@
-﻿
+
 <!DOCTYPE html>
 <html>
     <head>
@@ -16,6 +16,22 @@
             integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
             crossorigin=""
         ></script>
+
+        <link
+            rel="stylesheet"
+            href="https://unpkg.com/leaflet.markercluster@1.3.0/dist/MarkerCluster.Default.css"
+        />
+
+
+        <!-- Leaflet.markerclusterを読み込み -->
+        <script src="https://unpkg.com/leaflet.markercluster@1.3.0/dist/leaflet.markercluster.js"></script>
+        <link
+            rel="stylesheet"
+            href="https://unpkg.com/leaflet.markercluster@1.3.0/dist/MarkerCluster.css"
+        />
+  
+
+
     </head>
     <body>
         <!-- 地図を表示するdiv要素を宣言 -->
@@ -48,10 +64,15 @@
             // 地理院地図インスタンスへレイヤーを追加
             map.addLayer(chiriinLayer);
 
-            var LayerControl = L.control.layers({
-            "地理院地図（標準）": chiriinLayer,
-            "OpenStreetMap": backgroundLayer
-            }).addTo(map);
+            // 修正後
+            const LayerControl = L.control.layers(
+                {
+                    "OpenStreetMap": backgroundLayer,
+                    "地理院地図（標準）": chiriinLayer
+                },
+                {} // ← オーバーレイ用（最初は空）
+            ).addTo(map);
+
             // 下のようにも書ける
             L.marker([34.592331,135.505276]).bindPopup('杉本キャンパス').addTo(map);
 
@@ -64,8 +85,8 @@
             map.attributionControl.addAttribution(
                 '<a href="https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-P29-v2_0.html">国土数値情報 - 学校データ</a>',
                 );
-           // GeoJSONレイヤーを作成
-            fetch('./P29-21.geojson') // 全国分の学校データ（5万件超）のGeoJSONを非同期読み込み
+            // GeoJSONレイヤーを作成
+            fetch('./P29-21_27.geojson') // 全国分の学校データ（5万件超）のGeoJSONを非同期読み込み
                 .then((res) => res.json())
                 .then((json) => {
                     // クラスタリングレイヤーを作成し地図に追加
@@ -74,17 +95,10 @@
                              (layer) => layer.feature.properties.P29_004, // ポップアップで学校名を表示
                         )
                         .addTo(map);
+                    LayerControl.addOverlay(markers, "学校")
                     L.geoJSON(json).addTo(markers); // クラスタリングレイヤーにGeoJSONデータをセット
                 });
 
-            //スケールバー
-            L.control.scale().addTo(map);
-
-
-
-                    // チェックボックス
-                    LayerControl.addOverlay(markers, "学校") 
-	           
             // ラインレイヤーを作成
             fetch("./line.geojson") // ルートデータの非同期読み込み
                 .then((response) => response.json())
@@ -97,7 +111,8 @@
                     map.addLayer(line)
                     LayerControl.addOverlay(line, "ルート")
             });
-            // 行政区域レイヤーを作成
+
+                        // 行政区域レイヤーを作成
             fetch("./N03-23_27_230101.geojson") // 行政区域データを非同期読み込み
                 .then((response) => response.json())
                 .then((data) => {
@@ -110,10 +125,42 @@
                     LayerControl.addOverlay(selected_area, "行政区域")
                     // GeoJSONレイヤに地図がフィットするように表示範囲を自動調整
                     map.fitBounds(selected_area.getBounds());
-            });            
+            });
+            
+          
+
 
             //スケールバー
+        
             L.control.scale().addTo(map);
+
+
+            // OSRMサーバを使って杉本キャンパスからなかもずキャンパスまでのルートを検索するURL
+            const routeUrl = 'https://routing.openstreetmap.de/routed-car/route/v1/driving/135.505276,34.592331;135.506274,34.544865?geometries=geojson&overview=full';
+
+            async function addRouteLayer() {
+                const response = await fetch(routeUrl);
+                const json = await response.json();
+    
+                
+                const routeLayer = L.geoJSON(json['routes'][0]['geometry'], {
+                    "color": "#0000ff", 
+                    "weight": 6,
+                    "opacity": 0.65
+            });
+
+            routeLayer.addTo(map);
+
+            // レイヤーコントロール（右上のチェックボックス）にも追加したい場合
+            LayerControl.addOverlay(routeLayer, "キャンパス間ルート");
+
+            // 地図の表示範囲をルート全体に合わせる
+            map.fitBounds(routeLayer.getBounds());
+            }
+
+            // 関数の実行
+            addRouteLayer();
+
         </script>
     </body>
 </html>
